@@ -1,0 +1,11 @@
+.idea/
+__pycache__/
+cogs/__pycache__/
+*.pickle
+*.mp3
+*.json
+*.ini
+/Procfile
+/requirements.txt
+/configs.py
+
