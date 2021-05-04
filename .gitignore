@@ -9,3 +9,4 @@ cogs/__pycache__/
 /Procfile
 /requirements.txt
 /configs.py
+*.db

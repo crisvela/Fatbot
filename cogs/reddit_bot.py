@@ -3,19 +3,26 @@ from discord.ext import commands
 import Gatherer
 import aiohttp
 import io
-from fat_bot import is_not_james
+import os
+import json
+
+
+# Descriptions
+file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'command_descriptions.json')
+with open(file_path, "r") as file:
+    descriptions = json.load(file)
 
 
 class RedditBot(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command()
+    @commands.command(help=descriptions["tst"])
     async def tst(self, ctx):
         await ctx.send("Tsted!")
         print("Tsted!")
 
-    @commands.command(aliases=['gp'], help="Gets top image post from specified subreddit, or random if not specified")
+    @commands.command(aliases=['gp'], help=descriptions["get_posts"])
     async def get_posts(self, ctx, *, sub=None):
         print("Getting posts!")
         getter = Gatherer.Gatherer()

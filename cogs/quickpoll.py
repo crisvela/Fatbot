@@ -1,5 +1,13 @@
 import discord
 from discord.ext import commands
+import os
+import json
+
+
+# Descriptions
+file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'command_descriptions.json')
+with open(file_path, "r") as file:
+    descriptions = json.load(file)
 
 
 class QuickPoll(commands.Cog):
@@ -8,7 +16,7 @@ class QuickPoll(commands.Cog):
         self.last_poll = None
         self.last_results = None
 
-    @commands.command(pass_context=True)
+    @commands.command(pass_context=True, help=descriptions["quickpoll"])
     async def quickpoll(self, ctx, question, *options: str):
         if len(options) <= 1:
             await ctx.send('You need more than one option to make a poll!')
@@ -33,7 +41,7 @@ class QuickPoll(commands.Cog):
         self.last_poll = react_message.id
         await react_message.edit(embed=embed)
 
-    @commands.command(pass_context=True)
+    @commands.command(pass_context=True, help=descriptions["tally"])
     async def tally(self, ctx, id):
         if id == "last":
             id = self.last_poll

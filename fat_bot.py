@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 from os import path
 import discord
@@ -28,6 +29,11 @@ alert_counter = 0
 
 # DIRECTORIES
 image_dir = path.join(path.dirname(__file__), 'images')
+
+
+# DESCRIPTIONS
+with open("command_descriptions.json", "r") as file:
+    descriptions = json.load(file)
 
 
 # EVENT LISTENERS
@@ -121,7 +127,7 @@ def is_not_dylan(ctx):
 
 
 # USER COMMANDS
-@bot.command(help="Clears a specified number of messages, plus the one used to call this command")
+@bot.command(help=descriptions["clear"])
 async def clear(ctx, num=1):
     if not isinstance(ctx, discord.TextChannel):
         await ctx.channel.purge(limit=num + 1)
@@ -131,7 +137,7 @@ async def clear(ctx, num=1):
         print(f"{num} messages cleared from {ctx.name}!")
 
 
-@bot.command(aliases=["moji", "em", "m"])
+@bot.command(aliases=["moji", "em", "m"], help=descriptions["send_emoji"])
 async def send_emoji(ctx, emoji_name: str, count=1):
     await ctx.channel.purge(limit=1)
     sender_name = ctx.author.display_name
@@ -149,7 +155,7 @@ async def send_emoji(ctx, emoji_name: str, count=1):
             await ctx.send(embed=spam_embed)
 
 
-@bot.command(help="poggers champ")
+@bot.command(help=descriptions["pog"])
 @commands.is_owner()
 async def pog(ctx, num=1):
     await ctx.channel.purge(limit=1)
@@ -158,7 +164,7 @@ async def pog(ctx, num=1):
             await ctx.send(file=discord.File(img, "pog.png"))
 
 
-@bot.command()
+@bot.command(help=descriptions["dm"])
 async def dm(ctx, user: str, message: str):
     await ctx.channel.purge(limit=1)
     member_id = get_item(user, ctx.guild.members, use_id=False).id
@@ -168,7 +174,7 @@ async def dm(ctx, user: str, message: str):
         await ctx.guild.get_member(member_id).send("Hey sugar. You. Me. Skin to skin. Love that feeling")
 
 
-@bot.command()
+@bot.command(help=descriptions["switch_alarm"])
 async def switch_alarm(ctx):
     global alarm_control
     alarm_control = not alarm_control
@@ -178,7 +184,7 @@ async def switch_alarm(ctx):
         await ctx.send("The call alarm is now off!")
 
 
-@bot.command()
+@bot.command(help=descriptions["test"])
 async def test(message):
     print(message)
 

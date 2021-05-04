@@ -19,6 +19,8 @@ class YoutubeScraper:
         api_service_name = "youtube"
         api_version = "v3"
 
+        print("In get_video_url!")
+
         # Get credentials and create an API client
         creds = self.get_credentials()
         youtube = googleapiclient.discovery.build(
@@ -42,6 +44,9 @@ class YoutubeScraper:
             response = request.execute()["items"][0]
             video_url = self.base + response["id"]["videoId"]
             video_name = response["snippet"]["title"]
+
+            print("Got video details, returning!")
+            print("Video name: " + video_name)
 
             video_details = [video_url, video_name]
             return video_details
