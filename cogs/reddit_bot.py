@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-import Gatherer
+import gatherer
 import aiohttp
 import io
 import os
@@ -25,7 +25,7 @@ class RedditBot(commands.Cog):
     @commands.command(aliases=['gp'], help=descriptions["get_posts"])
     async def get_posts(self, ctx, *, sub=None):
         print("Getting posts!")
-        getter = Gatherer.Gatherer()
+        getter = gatherer.Gatherer()
         async with aiohttp.ClientSession() as session:
             async with session.get(await getter.get_sub_images(sub)) as response:
                 if response.status != 200:
@@ -35,8 +35,11 @@ class RedditBot(commands.Cog):
                     await ctx.send(f"{str(sub)} probably doesn't contain images, so here is a random subreddit post!")
                 elif getter.error_flag:
                     await ctx.send(f"{str(sub)} nonexistent or private, so here is a random subreddit post!")
-                await ctx.send(f"From {getter.sub_name}:")
-                await ctx.send(file=discord.File(data, 'your_face.png'))
+
+                emb = discord.Embed(title=f"From **r/{getter.sub_name}**:")
+                fl = discord.File(data, 'your_face.png')
+                emb.set_image(url="attachment://your_face.png")
+                await ctx.send(file=fl, embed=emb)
                 print("Post sent!")
                 await session.close()
 

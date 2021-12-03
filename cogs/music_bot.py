@@ -9,14 +9,15 @@ import lyricsgenius
 import random
 
 import db_manager
+import money_machine
 from configs import genius_token
 import youtube_scraper
 import cogs.quickpoll as quickpoll
+import spotify_scraper
 
 
 # Channel IDs
-main_channel_id = 814202376068137013
-test_channel_id = 814971629712572457
+main_channel_id = 887764219565584457
 
 # Descriptions
 file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'command_descriptions.json')
@@ -29,8 +30,10 @@ class MusicBot(commands.Cog):
         self.bot = bot
         self.emb_color = discord.Color.from_rgb(44, 47, 51)
         self.scraper = youtube_scraper.YoutubeScraper()
+        self.spot = spotify_scraper.SpotifyScraper()
         self.poller = quickpoll.QuickPoll(bot)
         self.database = db_manager.Database()
+        self.bank = money_machine.Bank()
         self.genius = lyricsgenius.Genius(genius_token, timeout=15)
         self.queue = []
         self.auto_play = True
@@ -40,6 +43,8 @@ class MusicBot(commands.Cog):
         self.current_song = None
         self.current_song_title = None
         self.skipping = False
+
+        self.vc_name = "General"
 
         self.codes = {"&#39;": "'", "&quot;": "\"", "&amp;": "&"}
 
@@ -61,7 +66,14 @@ class MusicBot(commands.Cog):
         print("Tstted!")
 
     @commands.command(aliases=['l'], help=descriptions["lyrics"])
-    async def lyrics(self, ctx, *, title):
+    async def lyrics(self, ctx, *, title: str = None):
+        if not title:
+            print("No title given!")
+            if self.current_song_title:
+                title = self.current_song_title
+        if not title:
+            await ctx.send("**No title specified or song playing!**")
+            return
         title = title.replace("\"", "").title()
         print(f"Getting lyrics for \"{title}\"")
         # musician = self.genius.search_artist(artist, max_songs=0, sort="title")
@@ -72,7 +84,7 @@ class MusicBot(commands.Cog):
         lyric = song.lyrics
         lyric = lyric.replace("\n\n\n\n", "\n").replace("\n\n\n", "\n").replace("\n\n", "\n")
         print(len(lyric))
-        await self.parse_and_send(ctx, lyric, f"**{song.title}**")
+        await self.parse_and_send(ctx, lyric, f"**{song.title}** by **{song.artist}**")
 
     @commands.command(aliases=["p"], help=descriptions["play"])
     async def play(self, ctx, *, title):
@@ -106,7 +118,7 @@ class MusicBot(commands.Cog):
         for file in os.listdir("./"):
             if file.endswith(".mp3"):
                 file_title = file.title().lower()
-                if self.matching_strings(song_name, file_title):
+                if matching_strings(song_name, file_title):
                     os.rename(file, "song.mp3")
                     print("File renamed!")
 
@@ -115,13 +127,6 @@ class MusicBot(commands.Cog):
 
         await ctx.send(f"**PLAYING {song_details[1]}:** {song_details[0]}")
         await self.all_ratings(ctx)
-
-        voice_channel = discord.utils.get(ctx.guild.voice_channels, name='fat-phone')
-        voice = discord.utils.get(self.bot.voice_clients, guild=ctx.guild)
-        if voice:
-            pass
-        else:
-            voice = await voice_channel.connect()
 
         try:
             if self.skipping:
@@ -132,15 +137,27 @@ class MusicBot(commands.Cog):
             self.current_caller = self.queue[0][1]
         print(ctx.guild.get_member(self.current_caller).display_name + " is playing a song!")
 
-        voice.play(discord.FFmpegPCMAudio("song.mp3"))
+        try:
+            voice = await self.connect()
+            voice.play(discord.FFmpegPCMAudio("song.mp3"))
+        except:
+            voice = await self.connect()
+            voice.play(discord.FFmpegPCMAudio("song.mp3"))
 
     @commands.command(help=descriptions["add_playlist"])
     async def add_playlist(self, ctx, url):
         self.auto_play = False
-        with youtube_dl.YoutubeDL(self.ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            for song in info["entries"]:
-                self.queue.append([[song["title"], song["id"]], ctx.author.id])
+        try:
+            with youtube_dl.YoutubeDL(self.ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                for song in info["entries"]:
+                    self.queue.append([[song["title"], song["id"]], ctx.author.id])
+
+        except youtube_dl.utils.DownloadError:
+            songs = self.spot.playlist_songs(url)
+            for song in songs:
+                self.queue.append([song, ctx.author.id])
+
         await ctx.send(f"**Added {url} to the queue!**")
         self.auto_play = True
 
@@ -229,7 +246,7 @@ class MusicBot(commands.Cog):
 
     @commands.command(help=descriptions["play_last"])
     async def play_last(self, ctx):
-        voice_channel = discord.utils.get(ctx.guild.voice_channels, name='fat-phone')
+        voice_channel = discord.utils.get(ctx.guild.voice_channels, name=self.vc_name)
         voice = discord.utils.get(self.bot.voice_clients, guild=ctx.guild)
         if voice:
             pass
@@ -342,12 +359,12 @@ class MusicBot(commands.Cog):
     @commands.command()
     @commands.is_owner()
     async def make_tables(self, ctx):
-        await self.database.create_tables()
+        await self.database.create_music_tables()
 
     @commands.command()
     @commands.is_owner()
     async def drop_tables(self, ctx):
-        await self.database.drop_tables()
+        await self.database.drop_music_tables()
 
     @commands.is_owner()
     @commands.command()
@@ -412,10 +429,33 @@ class MusicBot(commands.Cog):
         else:
             await ctx.send("No song has been played and song wasn't specified!")
 
+    # MONEY MACHINE
+    @commands.command()
+    async def my_balance(self, ctx):
+        balance = self.bank.display_balance(ctx.author.id)
+        await ctx.send(f"{ctx.author.display_name} has a balance of **${balance}**")
+
+    @commands.command()
+    async def all_balances(self, ctx):
+        message = ""
+        for member in ctx.guild.members:
+            if not member.bot:
+                balance = self.bank.display_balance(member.id)
+                message += f"**{member.display_name}** has a balance of **${balance}**\n"
+        message = message[:len(message)]
+        emb = discord.Embed(title=f"Balances", description=f"{message}", color=self.emb_color)
+        await ctx.send(embed=emb)
+
+    def withdraw(self, amount: int = None, user_id: int = None):
+        self.bank.withdraw(amount, user_id)
+
+    def deposit(self, amount: int = None, user_id: int = None):
+        self.bank.deposit(amount, user_id)
+
     # TASKS
     @tasks.loop(seconds=10)
     async def is_not_playing(self):
-        if self.queue and self.auto_play:
+        if self.queue and self.auto_play and not self.skipping:
             server = self.bot.guilds[0]
             voice = discord.utils.get(self.bot.voice_clients, guild=server)
             if voice:
@@ -425,7 +465,12 @@ class MusicBot(commands.Cog):
                     ctx = FakeContext(server)
                     await self._auto_skip(ctx=ctx)
             else:
-                voice_channel = discord.utils.get(server.voice_channels, name='fat-phone')
+                try:
+                    voice_channel = discord.utils.get(server.voice_channels, name=self.vc_name)
+                    if not voice_channel:
+                        raise ValueError
+                except ValueError:
+                    voice_channel = discord.utils.get(server.guild.voice_channels, name='General')
                 await voice_channel.connect()
                 ctx = FakeContext(server)
                 await self._auto_skip(ctx=ctx)
@@ -480,16 +525,27 @@ class MusicBot(commands.Cog):
             string = string.replace(key, value)
         return string
 
-    def matching_strings(self, str1, str2):
-        length = len(str1) if len(str1) <= len(str2) else len(str2)
-        matching_chars = 0
-        for i in range(0, length):
-            if str1[i] == str2[i]:
-                matching_chars += 1
-        match_percent = matching_chars * 1.0 / length
-        if match_percent > 0.8:
-            return True
-        return False
+    async def connect(self):
+        server = self.bot.guilds[0]
+        voice_channel = discord.utils.get(server.voice_channels, name=self.vc_name)
+        voice = discord.utils.get(self.bot.voice_clients, guild=server)
+        if voice:
+            pass
+        else:
+            voice = await voice_channel.connect()
+        return voice
+
+
+def matching_strings(str1, str2):
+    length = len(str1) if len(str1) <= len(str2) else len(str2)
+    matching_chars = 0
+    for i in range(0, length):
+        if str1[i] == str2[i]:
+            matching_chars += 1
+    match_percent = matching_chars * 1.0 / length
+    if match_percent > 0.8:
+        return True
+    return False
 
 
 class FakeContext:

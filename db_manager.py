@@ -5,14 +5,15 @@ from util_funcs import block_print, enable_print
 class Database:
 
     def __init__(self):
-        self.db_path = "C:/Users/cvela/MyCodeFolder/PythonFolder/Bots/Fatbot/music_records.db"
+        self.ratings_path = "C:/Users/cvela/MyCodeFolder/PythonFolder/Bots/Fatbot/music_records.db"
+        self.bank_path = "C:/Users/cvela/MyCodeFolder/PythonFolder/Bots/Fatbot/bank.db"
         self.tables = ["j_t", "d_t", "c_t"]
         self.keyed_tables = {477249470732697601: self.tables[0], 477270012592259082: self.tables[1],
                              387334819232874498: self.tables[2]}
         self.table_owners = {v: k for k, v in self.keyed_tables.items()}
 
     async def rate_song(self, title: str, score: int, critic: int):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with aiosqlite.connect(self.ratings_path) as db:
             rating = await self.get_rating(title, critic)
             if not rating:
                 await db.execute(f"INSERT INTO {self.keyed_tables[critic]} (title,score) VALUES ('{title}', '{score}')")
@@ -21,7 +22,7 @@ class Database:
             await db.commit()
 
     async def print_all_ratings(self):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with aiosqlite.connect(self.ratings_path) as db:
             for table in self.tables:
                 async with db.execute(f"SELECT * from {table}") as songs:
                     async for row in songs:
@@ -30,7 +31,7 @@ class Database:
 
     async def get_rating(self, title: str, critic: int):
         rating = None
-        async with aiosqlite.connect(self.db_path) as db:
+        async with aiosqlite.connect(self.ratings_path) as db:
             async with db.execute(f"SELECT * from {self.keyed_tables[critic]} WHERE title = '{title}'") as songs:
                 async for song in songs:
                     print(song)
@@ -43,7 +44,7 @@ class Database:
 
     async def get_all_ratings(self, title: str):
         rating = []
-        async with aiosqlite.connect(self.db_path) as db:
+        async with aiosqlite.connect(self.ratings_path) as db:
             for table in self.tables:
                 async with db.execute(f"SELECT * from {table} WHERE title = '{title}'") as songs:
                     async for song in songs:
@@ -57,7 +58,7 @@ class Database:
 
     async def get_songs(self, score: int):
         songs = []
-        async with aiosqlite.connect(self.db_path) as db:
+        async with aiosqlite.connect(self.ratings_path) as db:
             for table in self.tables:
                 async with db.execute(f"SELECT * from {table} WHERE score = {score}") as entries:
                     async for entry in entries:
@@ -68,8 +69,8 @@ class Database:
             await db.commit()
         return songs
 
-    async def create_tables(self):
-        async with aiosqlite.connect(self.db_path) as db:
+    async def create_music_tables(self):
+        async with aiosqlite.connect(self.ratings_path) as db:
             for table in self.tables:
                 await db.execute(f"""
                                 CREATE TABLE {table} (
@@ -80,8 +81,8 @@ class Database:
                 await db.commit()
             print("Table created!")
 
-    async def drop_tables(self):
-        async with aiosqlite.connect(self.db_path) as db:
+    async def drop_music_tables(self):
+        async with aiosqlite.connect(self.ratings_path) as db:
             for table in self.tables:
                 await db.execute(f"DROP TABLE {table}")
                 await db.commit()

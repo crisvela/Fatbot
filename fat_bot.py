@@ -17,13 +17,17 @@ bot = commands.Bot(command_prefix=".", intents=intents)
 main_channel_id = 814202376068137013
 test_channel_id = 814971629712572457
 
+# Channel Names
+vc_name = "General"
+
 # User IDs
 tiran_id = 477270012592259082
 jamez_id = 477249470732697601
+backup_id = 493043
 
 # Global Variables
 alert = False
-alarm_control = True
+alarm_control = False
 absent_members = []
 alert_counter = 0
 
@@ -53,25 +57,39 @@ async def on_message(message):
 
     words = message.content.split()
 
-    try:
-        if len(words) <= 2 and in_list(words[0], message.guild.emojis, use_id=False):
-            await message.channel.purge(limit=1)
-            sender_name = message.author.display_name
-            sender_url = message.author.avatar_url
-            image = get_item(words[0], message.guild.emojis, use_id=False).url
-            main_embed = discord.Embed(color=discord.Color.from_rgb(54, 57, 63))
-            main_embed.set_author(name=sender_name, icon_url=sender_url)
-            main_embed.set_image(url=image)
-            await message.channel.send(embed=main_embed)
-            print(f"{message.author.display_name} sent the emoji {words[0]}!")
-            if len(words) == 2:
-                if 1 < int(words[1]) < 11:
-                    spam_embed = discord.Embed(color=main_embed.colour)
-                    spam_embed.set_image(url=main_embed.image.url)
-                    for num in range(int(words[1])):
-                        await message.channel.send(embed=spam_embed)
-    except (IndexError, AttributeError):
-        pass
+    emoji_limit = 10
+    banned_emojis = []#["twasok", "beegbrain", "WILDN", "femstobal"]
+
+    member_blacklist = []#[jamez_id, backup_id]
+
+    if message.author.id not in member_blacklist:
+        try:
+            if len(words) <= 2 and in_list(words[0], message.guild.emojis, use_id=False) and words[0] not in banned_emojis:
+                await message.channel.purge(limit=1)
+                sender_name = message.author.display_name
+                sender_url = message.author.avatar_url
+                image = get_item(words[0], message.guild.emojis, use_id=False).url
+                main_embed = discord.Embed(color=discord.Color.from_rgb(54, 57, 63))
+                main_embed.set_author(name=sender_name, icon_url=sender_url)
+                main_embed.set_image(url=image)
+                await message.channel.send(embed=main_embed)
+                print(f"{message.author.display_name} sent the emoji {words[0]}!")
+                if len(words) == 2:
+                    if 1 < int(words[1]) < emoji_limit + 1:
+                        spam_embed = discord.Embed(color=main_embed.colour)
+                        spam_embed.set_image(url=main_embed.image.url)
+                        for num in range(int(words[1])):
+                            await message.channel.send(embed=spam_embed)
+        except (IndexError, AttributeError):
+            pass
+    else:
+        try:
+            content = message.content
+            await message.delete()
+            with open("james.txt", "a") as stuff:
+                stuff.write(content + "\n")
+        except discord.errors.Forbidden:
+            pass
 
 
 @bot.event
@@ -119,14 +137,20 @@ async def on_command_error(ctx, error):
 
 # CHECKS
 def is_not_james(ctx):
-    return ctx.author.id != jamez_id
+    return ctx.message.author.id != jamez_id
 
 
 def is_not_dylan(ctx):
-    return ctx.author.id != tiran_id
+    return ctx.message.author.id != tiran_id
+
+
+def is_not_second_acc(ctx):
+    return ctx.message.author.id != backup_id
 
 
 # USER COMMANDS
+@commands.check(is_not_james)
+@commands.check(is_not_second_acc)
 @bot.command(help=descriptions["clear"])
 async def clear(ctx, num=1):
     if not isinstance(ctx, discord.TextChannel):
@@ -165,7 +189,7 @@ async def pog(ctx, num=1):
 
 
 @bot.command(help=descriptions["dm"])
-async def dm(ctx, user: str, message: str):
+async def dm(ctx, user: str, message: str = None):
     await ctx.channel.purge(limit=1)
     member_id = get_item(user, ctx.guild.members, use_id=False).id
     if message:
@@ -174,7 +198,7 @@ async def dm(ctx, user: str, message: str):
         await ctx.guild.get_member(member_id).send("Hey sugar. You. Me. Skin to skin. Love that feeling")
 
 
-@bot.command(help=descriptions["switch_alarm"])
+@bot.command(help=descriptions["switch_alarm"], aliases=["alarm"])
 async def switch_alarm(ctx):
     global alarm_control
     alarm_control = not alarm_control
@@ -211,8 +235,8 @@ async def alert_members():
     if alert and alarm_control:
         server = bot.guilds[0]
         channel = server.get_channel(main_channel_id)
-        call_emoji = str(get_item("rileyPhone", server.emojis, False))
-        sad_emoji = str(get_item("jadenCry", server.emojis, False))
+        call_emoji = str(get_item("slay", server.emojis, False))
+        sad_emoji = str(get_item("creep", server.emojis, False))
         absentees = ""
         counter = 1
         for member in absent_members:
@@ -229,6 +253,24 @@ async def alert_members():
             await channel.send(f"please, {absentees}, join. i'm lonely {sad_emoji}")
         await asyncio.sleep(2)
         await channel.purge(limit=1)
+
+
+@tasks.loop(seconds=4)
+async def auto_leave():
+    server = bot.guilds[0]
+    voice_channel = discord.utils.get(server.voice_channels, name=vc_name)
+    voice = discord.utils.get(bot.voice_clients, guild=server)
+    if voice and voice.is_connected():
+        if len(voice_channel.members) == 1:
+            await voice.disconnect()
+    else:
+        pass
+
+
+@auto_leave.before_loop
+async def before_auto_leave():
+    print('waiting...')
+    await bot.wait_until_ready()
 
 
 # UTILITY FUNCTIONS
@@ -259,4 +301,5 @@ for filename in os.listdir('./cogs'):
         bot.load_extension(f'cogs.{filename[:-3]}')
 
 alert_members.start()
+auto_leave.start()
 bot.run(configs.token)

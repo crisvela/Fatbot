@@ -5,13 +5,14 @@ from asyncprawcore.exceptions import NotFound
 
 class Gatherer:
     def __init__(self):
-        self.reddit = asyncpraw.Reddit(site_name="WardenBotScraper", user_agent="Warden User Agent")
+        self.reddit = None
         self.subreddit = None
         self.error_flag = False
         self.no_img_flag = False
         self.sub_name = ""
     
     async def get_sub_images(self, subreddit, num=50, invalid_ids=None):
+        self.reddit = asyncpraw.Reddit(site_name="WardenBotScraper", user_agent="Warden User Agent")
         print(f"get_sub_images was called! Subreddit: {subreddit}! Num: {num}")
         if await self.sub_available(subreddit):
             print("Valid Sub!")
@@ -56,6 +57,7 @@ class Gatherer:
                         print("Post appended!")
                         post = submission.url
                         break
+        await self.reddit.close()
         if not post:
             self.no_img_flag = True
             return await self.get_sub_images(None)
