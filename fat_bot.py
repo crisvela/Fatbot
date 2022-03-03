@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import random
 from os import path
 import discord
 from discord.ext import commands, tasks
@@ -36,8 +37,8 @@ image_dir = path.join(path.dirname(__file__), 'images')
 
 
 # DESCRIPTIONS
-with open("command_descriptions.json", "r") as file:
-    descriptions = json.load(file)
+with open("command_descriptions.json", "r") as comm_desc:
+    descriptions = json.load(comm_desc)
 
 
 # EVENT LISTENERS
@@ -58,28 +59,62 @@ async def on_message(message):
     words = message.content.split()
 
     emoji_limit = 10
-    banned_emojis = []#["twasok", "beegbrain", "WILDN", "femstobal"]
+    banned_emojis = []  # ["twasok", "beegbrain", "WILDN", "femstobal"]
 
-    member_blacklist = []#[jamez_id, backup_id]
+    with open("banned_messages.txt", "r", encoding="utf-8") as file:
+        banned_messages = file.readlines()
+
+    banned_words = ["ask", "asked"]
+
+    member_blacklist = []  # [jamez_id, backup_id]
+
+    deleted = False
+
+    for phrase in banned_messages:
+        if phrase.strip() in message.content:
+            await message.delete()
+            deleted = True
+            break
+
+    if not deleted:
+        for bad_word in banned_words:
+            for word in words:
+                if bad_word in word[0:len(bad_word)].lower():
+                    await message.delete()
+                    deleted = True
+                    break
 
     if message.author.id not in member_blacklist:
         try:
-            if len(words) <= 2 and in_list(words[0], message.guild.emojis, use_id=False) and words[0] not in banned_emojis:
-                await message.channel.purge(limit=1)
-                sender_name = message.author.display_name
-                sender_url = message.author.avatar_url
-                image = get_item(words[0], message.guild.emojis, use_id=False).url
-                main_embed = discord.Embed(color=discord.Color.from_rgb(54, 57, 63))
-                main_embed.set_author(name=sender_name, icon_url=sender_url)
-                main_embed.set_image(url=image)
-                await message.channel.send(embed=main_embed)
-                print(f"{message.author.display_name} sent the emoji {words[0]}!")
-                if len(words) == 2:
-                    if 1 < int(words[1]) < emoji_limit + 1:
-                        spam_embed = discord.Embed(color=main_embed.colour)
-                        spam_embed.set_image(url=main_embed.image.url)
-                        for num in range(int(words[1])):
-                            await message.channel.send(embed=spam_embed)
+            if not deleted:
+                if len(words) <= 2 and in_list(words[0], message.guild.emojis, use_id=False):
+                    if words[0] not in banned_emojis:
+                        sender_name = message.author.display_name
+                        sender_url = message.author.avatar_url
+                        image = get_item(words[0], message.guild.emojis, use_id=False).url
+                        main_embed = discord.Embed(color=discord.Color.from_rgb(54, 57, 63))
+                        main_embed.set_author(name=sender_name, icon_url=sender_url)
+                        main_embed.set_image(url=image)
+                        await message.channel.send(embed=main_embed)
+                        print(f"{message.author.display_name} sent the emoji {words[0]}!")
+                        if len(words) == 2:
+                            if 1 < int(words[1]) < emoji_limit + 1:
+                                spam_embed = discord.Embed(color=main_embed.colour)
+                                spam_embed.set_image(url=main_embed.image.url)
+                                for num in range(int(words[1])):
+                                    await message.channel.send(embed=spam_embed)
+                        await message.delete()
+                elif len(words) <= 2:
+
+                    toe_gifs = ["https://tenor.com/view/bloxnuts-feet-gif-21235154",
+                                "https://tenor.com/view/pedicure-nails-disgusting-happy-feet-trendizisst-gif-15635043",
+                                "https://tenor.com/view/clarkvandyer-feet-happy-chill-gif-17640590",
+                                "https://tenor.com/view/xu-toe-toes-toenail-foot-gif-17753109"]
+
+                    if words[0] == "toes" and message.author.id == 387334819232874498:
+                        await message.channel.send(random.choice(toe_gifs))
+                        await message.delete()
+
         except (IndexError, AttributeError):
             pass
     else:
@@ -115,7 +150,7 @@ async def on_voice_state_update(member, before, after):
         alert = False
         print(f"{member.display_name} left voice channel!")
 
-
+"""
 @bot.event
 async def on_command_error(ctx, error):
     error = getattr(error, "original", error)
@@ -132,7 +167,7 @@ async def on_command_error(ctx, error):
     elif isinstance(error, commands.ExtensionNotLoaded):
         await ctx.send("Extension isn't loaded!")
     elif isinstance(error, commands.NotOwner):
-        await ctx.send("You ain't the owner, so you can't use this!")
+        await ctx.send("You ain't the owner, so you can't use this!")"""
 
 
 # CHECKS
@@ -161,9 +196,21 @@ async def clear(ctx, num=1):
         print(f"{num} messages cleared from {ctx.name}!")
 
 
+@commands.check(commands.is_owner())
+@bot.command()
+async def report(ctx, message_id):
+    message = await ctx.channel.fetch_message(message_id)
+    words = message.content
+
+    print(words)
+
+    with open("banned_messages.txt", "a", encoding="utf-8") as file:
+        file.write(words + "\n")
+
+
 @bot.command(aliases=["moji", "em", "m"], help=descriptions["send_emoji"])
 async def send_emoji(ctx, emoji_name: str, count=1):
-    await ctx.channel.purge(limit=1)
+    await ctx.message.delete()
     sender_name = ctx.author.display_name
     sender_url = ctx.author.avatar_url
     image = get_item(emoji_name, ctx.guild.emojis, use_id=False).url
@@ -182,16 +229,16 @@ async def send_emoji(ctx, emoji_name: str, count=1):
 @bot.command(help=descriptions["pog"])
 @commands.is_owner()
 async def pog(ctx, num=1):
-    await ctx.channel.purge(limit=1)
+    await ctx.message.delete()
     for nm in range(num):
         with open("pog.png", "rb") as img:
             await ctx.send(file=discord.File(img, "pog.png"))
 
 
 @bot.command(help=descriptions["dm"])
-async def dm(ctx, user: str, message: str = None):
-    await ctx.channel.purge(limit=1)
-    member_id = get_item(user, ctx.guild.members, use_id=False).id
+async def dm(ctx, user: int, *, message=None):
+    await ctx.message.delete()
+    member_id = get_item(user, ctx.guild.members, use_id=True).id
     if message:
         await ctx.guild.get_member(member_id).send(message)
     else:
@@ -247,12 +294,10 @@ async def alert_members():
             counter += 1
         global alert_counter
         if alert_counter < 10:
-            await channel.send(f"Ring ring ring, {absentees}, Fat Phone calling! {call_emoji}")
+            await channel.send(f"Ring ring ring, {absentees}, Fat Phone calling! {call_emoji}", delete_after=2)
             alert_counter += 1
         else:
-            await channel.send(f"please, {absentees}, join. i'm lonely {sad_emoji}")
-        await asyncio.sleep(2)
-        await channel.purge(limit=1)
+            await channel.send(f"please, {absentees}, join. i'm lonely {sad_emoji}", delete_after=2)
 
 
 @tasks.loop(seconds=4)

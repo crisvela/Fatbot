@@ -1,5 +1,4 @@
 import aiosqlite
-from util_funcs import block_print, enable_print
 
 
 class Database:
@@ -42,6 +41,16 @@ class Database:
             await db.commit()
         return rating
 
+    async def get_critic_ratings(self, critic: int):
+        ratings = []
+        async with aiosqlite.connect(self.ratings_path) as db:
+            async with db.execute(f"SELECT * from {self.keyed_tables[critic]}") as songs:
+                async for song in songs:
+                    score = [song[0], song[1]]
+                    ratings.append(score)
+            await db.commit()
+        return ratings
+
     async def get_all_ratings(self, title: str):
         rating = []
         async with aiosqlite.connect(self.ratings_path) as db:
@@ -68,6 +77,11 @@ class Database:
                 print(f"No songs were rated: {score}!")
             await db.commit()
         return songs
+
+    async def prune_songs(self, title: str, critic: int):
+        async with aiosqlite.connect(self.ratings_path) as db:
+            await db.execute(f"DELETE from {self.keyed_tables[critic]} WHERE title = '{title}'")
+            await db.commit()
 
     async def create_music_tables(self):
         async with aiosqlite.connect(self.ratings_path) as db:

@@ -14,15 +14,34 @@ from configs import genius_token
 import youtube_scraper
 import cogs.quickpoll as quickpoll
 import spotify_scraper
+import grapher
 
 
 # Channel IDs
 main_channel_id = 887764219565584457
 
+# User IDs
+tiran_id = 477270012592259082
+jamez_id = 477249470732697601
+backup_id = 493043
+
 # Descriptions
 file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'command_descriptions.json')
-with open(file_path, "r") as file:
-    descriptions = json.load(file)
+with open(file_path, "r") as desc:
+    descriptions = json.load(desc)
+
+
+# CHECKS
+def is_not_james(ctx):
+    return ctx.message.author.id != jamez_id
+
+
+def is_not_dylan(ctx):
+    return ctx.message.author.id != tiran_id
+
+
+def is_not_second_acc(ctx):
+    return ctx.message.author.id != backup_id
 
 
 class MusicBot(commands.Cog):
@@ -35,6 +54,7 @@ class MusicBot(commands.Cog):
         self.database = db_manager.Database()
         self.bank = money_machine.Bank()
         self.genius = lyricsgenius.Genius(genius_token, timeout=15)
+        self.analyzer = grapher.Analyzer()
         self.queue = []
         self.auto_play = True
         self.is_not_playing.start()
@@ -43,6 +63,7 @@ class MusicBot(commands.Cog):
         self.current_song = None
         self.current_song_title = None
         self.skipping = False
+        self.auto_skipping = False
 
         self.vc_name = "General"
 
@@ -52,12 +73,13 @@ class MusicBot(commands.Cog):
 
         self.ydl_opts = {
             'format': 'bestaudio/best',
-            'match_title': True,
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
+            'youtube_include_dash_manifest': False,
+            'verbose': False
+        }
+
+        self.ffmpeg_opts = {
+            'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
+            'options': '-vn',
         }
 
     @commands.command(help=descriptions["tstt"])
@@ -88,13 +110,18 @@ class MusicBot(commands.Cog):
 
     @commands.command(aliases=["p"], help=descriptions["play"])
     async def play(self, ctx, *, title):
-        song_there = os.path.isfile("song.mp3")
+
+        auto = False
+
         try:
-            if not self.queue:
-                if song_there:
-                    os.remove("song.mp3")
-        except PermissionError:
-            await ctx.send("Wait for the current song to end or use the 'stop' command!")
+            ctx.auto = False
+            auto = True
+        except AttributeError:
+            pass
+
+        voice = await self.connect()
+        if voice.is_playing() or voice.is_paused() or (self.auto_skipping and not auto):
+            await ctx.send("Wait for music to stop playing, or use the .stop command!")
             return
 
         with youtube_dl.YoutubeDL(self.ydl_opts) as ydl:
@@ -102,25 +129,9 @@ class MusicBot(commands.Cog):
                 song_details = [self.scraper.base + title[1], title[0]]
             else:
                 song_details = self.scraper.get_video_url(query=title)
-            ydl.download([song_details[0]])
+            info = ydl.extract_info(song_details[0], download=False)
+            url = info['formats'][0]['url']
             song_details[1] = self.partial_decode(song_details[1])
-
-        song_there = os.path.isfile("song.mp3")
-        try:
-            if song_there:
-                os.remove("song.mp3")
-        except PermissionError:
-            await ctx.send("Wait for the current song to end or use the 'stop' command!")
-            return
-
-        song_name = song_details[1].lower()
-
-        for file in os.listdir("./"):
-            if file.endswith(".mp3"):
-                file_title = file.title().lower()
-                if matching_strings(song_name, file_title):
-                    os.rename(file, "song.mp3")
-                    print("File renamed!")
 
         self.current_song = song_details[0]
         self.current_song_title = song_details[1]
@@ -137,12 +148,11 @@ class MusicBot(commands.Cog):
             self.current_caller = self.queue[0][1]
         print(ctx.guild.get_member(self.current_caller).display_name + " is playing a song!")
 
-        try:
-            voice = await self.connect()
-            voice.play(discord.FFmpegPCMAudio("song.mp3"))
-        except:
-            voice = await self.connect()
-            voice.play(discord.FFmpegPCMAudio("song.mp3"))
+        voice = await self.connect()
+        if not voice.is_playing() and not voice.is_paused():
+            voice.play(discord.FFmpegPCMAudio(url, **self.ffmpeg_opts))
+        else:
+            await ctx.send("Wait for music to stop playing, or use the .stop command!")
 
     @commands.command(help=descriptions["add_playlist"])
     async def add_playlist(self, ctx, url):
@@ -288,6 +298,7 @@ class MusicBot(commands.Cog):
 
     async def _auto_skip(self, ctx):
         self.skipping = True
+        self.auto_skipping = True
         print("Autoplay is skipping!")
         await self.stop(ctx)
         try:
@@ -297,6 +308,7 @@ class MusicBot(commands.Cog):
         except IndexError:
             await ctx.send("Nothing in queue!")
         self.skipping = False
+        self.auto_skipping = False
 
     @commands.command(help=descriptions["pause"])
     async def pause(self, ctx):
@@ -333,6 +345,7 @@ class MusicBot(commands.Cog):
         else:
             await ctx.send("Not connected to a voice channel!")
 
+    @commands.check(is_not_james)
     @commands.command(aliasese=["vs"], help=descriptions["vote_skip"])
     async def vote_skip(self, ctx):
         question = "**Skip song?** You have **10** seconds to vote!"
@@ -370,6 +383,24 @@ class MusicBot(commands.Cog):
     @commands.command()
     async def print_ratings(self, ctx):
         await self.database.print_all_ratings()
+
+    @commands.command()
+    async def my_ratings(self, ctx):
+        ratings = await self.database.get_critic_ratings(ctx.author.id)
+        rating_message = ""
+        for rating in ratings:
+            rating_message += f"""{rating[0]} - **{rating[1]}/10**\n"""
+        rating_message = rating_message[:len(rating_message) - 1]
+        await self.parse_and_send(ctx, rating_message, f"{ctx.author.display_name}'s Ratings")
+
+    @commands.command()
+    async def graph_ratings(self, ctx):
+        file_name = await self.analyzer.graph(ctx.author.id)
+        with open(file_name, "rb") as file:
+            emb = discord.Embed(title=f"{ctx.author.display_name}'s Ratings")
+            fl = discord.File(file, 'data.png')
+            emb.set_image(url="attachment://data.png")
+            await ctx.send(file=fl, embed=emb)
 
     @commands.command(help=descriptions["all_ratings"])
     async def all_ratings(self, ctx, *, title: str = None):
@@ -414,6 +445,15 @@ class MusicBot(commands.Cog):
             await ctx.send(embed=emb)
         else:
             await ctx.send("No song has been played and song wasn't specified!")
+
+    @commands.command()
+    async def prune(self, ctx, *, title: str = None):
+        if not title:
+            if self.current_song_title:
+                title = self.current_song_title
+        if title:
+            await self.database.prune_songs(title, ctx.author.id)
+            await ctx.send(f"**Deleted** {title} from **{ctx.author.display_name}'s** ratings!")
 
     @commands.command(help=descriptions["is_rated"])
     async def is_rated(self, ctx, *, title: str = None):
@@ -552,6 +592,7 @@ class FakeContext:
     def __init__(self, guild):
         self.guild = guild
         self.channel = guild.get_channel(main_channel_id)
+        self.auto = True
 
     async def send(self, *message, embed=None):
         if embed:
