@@ -15,6 +15,7 @@ class QuickPoll(commands.Cog):
         self.bot = bot
         self.last_poll = None
         self.last_results = None
+        self.multi_vote = True
 
     @commands.command(pass_context=True, help=descriptions["quickpoll"])
     async def quickpoll(self, ctx, question, *options: str):
@@ -61,20 +62,25 @@ class QuickPoll(commands.Cog):
             print("This embed has no footer!")
             return
         unformatted_options = [x.strip() for x in embed.description.split('\n')]
-        opt_dict = {x[:2]: x[3:] for x in unformatted_options} if unformatted_options[0][0] == '1' \
+        opt_dict = {x[:2].strip(): x[3:] for x in unformatted_options} if unformatted_options[0][0] == '1' \
             else {x[:1]: x[2:] for x in unformatted_options}
+
+        print(f"Opt Dict: {opt_dict}")
         # check if we're using numbers for the poll, or x/checkmark, parse accordingly
         voters = [ctx.guild.me.id]  # add the bot's ID to the list of voters to exclude it's votes
 
         print("Tallying!")
         tally = {x: 0 for x in opt_dict.keys()}
+
+        print([i for i in poll_message.reactions])
         for reaction in poll_message.reactions:
             if reaction.emoji in opt_dict.keys():
                 reactors = await reaction.users().flatten()
                 for reactor in reactors:
                     if reactor.id not in voters:
                         tally[reaction.emoji] += 1
-                        voters.append(reactor.id)
+                        if not self.multi_vote:
+                            voters.append(reactor.id)
 
         output = 'Results of the poll for "{}":\n'.format(embed.title) + \
                  '\n'.join(['{}: {}'.format(opt_dict[key], tally[key]) for key in tally.keys()])

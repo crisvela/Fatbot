@@ -411,10 +411,14 @@ class MusicBot(commands.Cog):
             ratings = await self.database.get_all_ratings(self.sql_encode(title))
             if ratings:
                 rating_message = ""
+                average_rating = 0
                 for rating in ratings:
                     rating_message += f"""**{ctx.guild.get_member(rating[0]).display_name}** \
                                       rated this a: **{rating[1]}/10**\n"""
-                rating_message = rating_message[:len(rating_message) - 1]
+                    average_rating += rating[1]
+                average_rating /= len(ratings)
+                rating_message += f"_Average Rating_: **{average_rating}**"
+                rating_message = rating_message[:len(rating_message)]
                 await self.parse_and_send(ctx, rating_message, f"\"{title}\" Ratings")
             else:
                 await ctx.send(f"**{title}** not rated by anyone yet!")
@@ -435,6 +439,8 @@ class MusicBot(commands.Cog):
 
     @commands.command(help=descriptions["rate"])
     async def rate(self, ctx, score: int, *, title: str = None):
+        if score > 11 or score < 0:
+            score = 11
         if not title:
             if self.current_song_title:
                 title = self.current_song_title

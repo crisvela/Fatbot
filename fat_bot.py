@@ -1,4 +1,3 @@
-import asyncio
 import json
 import os
 import random
@@ -24,6 +23,7 @@ vc_name = "General"
 # User IDs
 tiran_id = 477270012592259082
 jamez_id = 477249470732697601
+alex_id = 751495550947557428
 backup_id = 493043
 
 # Global Variables
@@ -59,7 +59,7 @@ async def on_message(message):
     words = message.content.split()
 
     emoji_limit = 10
-    banned_emojis = []  # ["twasok", "beegbrain", "WILDN", "femstobal"]
+    banned_emojis = ["crissysleep"]  # ["twasok", "beegbrain", "WILDN", "femstobal"]
 
     with open("banned_messages.txt", "r", encoding="utf-8") as file:
         banned_messages = file.readlines()
@@ -69,6 +69,11 @@ async def on_message(message):
     member_blacklist = []  # [jamez_id, backup_id]
 
     deleted = False
+
+    if "amogus" in words:
+        await message.channel.send("ඞ")
+        await message.delete()
+        deleted = True
 
     for phrase in banned_messages:
         if phrase.strip() in message.content:
@@ -109,7 +114,9 @@ async def on_message(message):
                     toe_gifs = ["https://tenor.com/view/bloxnuts-feet-gif-21235154",
                                 "https://tenor.com/view/pedicure-nails-disgusting-happy-feet-trendizisst-gif-15635043",
                                 "https://tenor.com/view/clarkvandyer-feet-happy-chill-gif-17640590",
-                                "https://tenor.com/view/xu-toe-toes-toenail-foot-gif-17753109"]
+                                "https://tenor.com/view/xu-toe-toes-toenail-foot-gif-17753109",
+                                "https://tenor.com/view/toes-gif-18399097",
+                                "https://tenor.com/view/biqtch-puddin-dragula-toes-gif-14253342"]
 
                     if words[0] == "toes" and message.author.id == 387334819232874498:
                         await message.channel.send(random.choice(toe_gifs))
@@ -179,12 +186,18 @@ def is_not_dylan(ctx):
     return ctx.message.author.id != tiran_id
 
 
+def is_not_alex(ctx):
+    return ctx.message.author.id != alex_id
+
+
 def is_not_second_acc(ctx):
     return ctx.message.author.id != backup_id
 
 
 # USER COMMANDS
 @commands.check(is_not_james)
+@commands.check(is_not_dylan)
+@commands.check(is_not_alex)
 @commands.check(is_not_second_acc)
 @bot.command(help=descriptions["clear"])
 async def clear(ctx, num=1):
@@ -194,6 +207,16 @@ async def clear(ctx, num=1):
     else:
         await ctx.purge(limit=num + 1)
         print(f"{num} messages cleared from {ctx.name}!")
+
+
+@bot.command()
+async def coinflip(ctx):
+    result = random.randint(0, 1)
+    if result == 0:
+        choice = "Heads"
+    else:
+        choice = "Tails"
+    await ctx.channel.send(choice)
 
 
 @commands.check(commands.is_owner())
