@@ -46,7 +46,7 @@ with open("command_descriptions.json", "r") as comm_desc:
 async def on_ready():
     scraper = youtube_scraper.YoutubeScraper()
     latest_vid = scraper.get_video_url("Culinary Cam", latest=True)
-    act = discord.Streaming(name="Being fat!",
+    act = discord.Streaming(name="Gaming!",
                             url=latest_vid[0])
     await bot.change_presence(activity=act, status=discord.Status.online)
     print("Bot is ready!")
@@ -59,21 +59,16 @@ async def on_message(message):
     words = message.content.split()
 
     emoji_limit = 10
-    banned_emojis = ["crissysleep"]  # ["twasok", "beegbrain", "WILDN", "femstobal"]
+    banned_emojis = []
 
     with open("banned_messages.txt", "r", encoding="utf-8") as file:
         banned_messages = file.readlines()
 
     banned_words = ["ask", "asked"]
 
-    member_blacklist = []  # [jamez_id, backup_id]
+    member_blacklist = []
 
     deleted = False
-
-    if "amogus" in words:
-        await message.channel.send("ඞ")
-        await message.delete()
-        deleted = True
 
     for phrase in banned_messages:
         if phrase.strip() in message.content:
@@ -108,18 +103,6 @@ async def on_message(message):
                                 spam_embed.set_image(url=main_embed.image.url)
                                 for num in range(int(words[1])):
                                     await message.channel.send(embed=spam_embed)
-                        await message.delete()
-                elif len(words) <= 2:
-
-                    toe_gifs = ["https://tenor.com/view/bloxnuts-feet-gif-21235154",
-                                "https://tenor.com/view/pedicure-nails-disgusting-happy-feet-trendizisst-gif-15635043",
-                                "https://tenor.com/view/clarkvandyer-feet-happy-chill-gif-17640590",
-                                "https://tenor.com/view/xu-toe-toes-toenail-foot-gif-17753109",
-                                "https://tenor.com/view/toes-gif-18399097",
-                                "https://tenor.com/view/biqtch-puddin-dragula-toes-gif-14253342"]
-
-                    if words[0] == "toes" and message.author.id == 387334819232874498:
-                        await message.channel.send(random.choice(toe_gifs))
                         await message.delete()
 
         except (IndexError, AttributeError):
@@ -265,7 +248,7 @@ async def dm(ctx, user: int, *, message=None):
     if message:
         await ctx.guild.get_member(member_id).send(message)
     else:
-        await ctx.guild.get_member(member_id).send("Hey sugar. You. Me. Skin to skin. Love that feeling")
+        await ctx.guild.get_member(member_id).send("Test DM")
 
 
 @bot.command(help=descriptions["switch_alarm"], aliases=["alarm"])
@@ -306,7 +289,6 @@ async def alert_members():
         server = bot.guilds[0]
         channel = server.get_channel(main_channel_id)
         call_emoji = str(get_item("slay", server.emojis, False))
-        sad_emoji = str(get_item("creep", server.emojis, False))
         absentees = ""
         counter = 1
         for member in absent_members:
@@ -317,10 +299,10 @@ async def alert_members():
             counter += 1
         global alert_counter
         if alert_counter < 10:
-            await channel.send(f"Ring ring ring, {absentees}, Fat Phone calling! {call_emoji}", delete_after=2)
+            await channel.send(f"Ring ring ring, {absentees}, someone is calling! {call_emoji}", delete_after=2)
             alert_counter += 1
         else:
-            await channel.send(f"please, {absentees}, join. i'm lonely {sad_emoji}", delete_after=2)
+            await channel.send(f"please, {absentees}, join.", delete_after=2)
 
 
 @tasks.loop(seconds=4)

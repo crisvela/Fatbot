@@ -37,8 +37,8 @@ class RedditBot(commands.Cog):
                     await ctx.send(f"{str(sub)} nonexistent or private, so here is a random subreddit post!")
 
                 emb = discord.Embed(title=f"From **r/{getter.sub_name}**:")
-                fl = discord.File(data, 'your_face.png')
-                emb.set_image(url="attachment://your_face.png")
+                fl = discord.File(data, 'result.png')
+                emb.set_image(url="attachment://result.png")
                 await ctx.send(file=fl, embed=emb)
                 print("Post sent!")
                 await session.close()

@@ -125,6 +125,7 @@ class MusicBot(commands.Cog):
             return
 
         with youtube_dl.YoutubeDL(self.ydl_opts) as ydl:
+            ydl.cache.remove()
             if isinstance(title, list):
                 song_details = [self.scraper.base + title[1], title[0]]
             else:
